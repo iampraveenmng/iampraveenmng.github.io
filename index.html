@@ -61,8 +61,8 @@
         
         <!-- Header Section -->
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-slate-900">My AI-Powered Kanban Board</h1>
-            <p class="text-slate-500 mt-2">Let AI help you organize and plan your workflow.</p>
+            <h1 class="text-4xl font-bold text-slate-900">TASK MANAGER</h1>
+            <p class="text-slate-500 mt-2">TO PLAN MY DAY TO DAY TASKS.</p>
         </header>
 
         <!-- Action Buttons -->
@@ -156,9 +156,9 @@
 
             // --- State Management ---
             let tasks = JSON.parse(localStorage.getItem('tasks')) || [
-                { id: `task-${Date.now()}-1`, text: 'Launch a new marketing campaign for Q3', status: 'todo' },
-                { id: `task-${Date.now()}-2`, text: 'Develop the user authentication feature', status: 'inprogress' },
-                { id: `task-${Date.now()}-3`, text: 'Set up the project repository on GitHub', status: 'done' },
+                { id: `task-${Date.now()}-1`, text: 'CI/CD', status: 'todo' },
+                { id: `task-${Date.now()}-2`, text: 'SPARK', status: 'inprogress' },
+                { id: `task-${Date.now()}-3`, text: 'PYTHON', status: 'done' },
             ];
             const saveTasks = () => localStorage.setItem('tasks', JSON.stringify(tasks));
 
