@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Kanban Task Tracker</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- SortableJS for drag-and-drop functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <!-- Canvas-confetti for the celebration animation -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom styles to enhance the look and feel */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Styling for the scrollbar */
+        .tasks-container::-webkit-scrollbar { width: 8px; }
+        .tasks-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .tasks-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .tasks-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Drag-and-drop styles */
+        .sortable-ghost { background: #e0f2fe; border: 2px dashed #0ea5e9; opacity: 0.7; }
+        .sortable-drag { opacity: 1 !important; transform: rotate(4deg); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #loadingOverlay {
+            transition: opacity 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-slate-900">My AI-Powered Kanban Board</h1>
+            <p class="text-slate-500 mt-2">Let AI help you organize and plan your workflow.</p>
+        </header>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-center items-center gap-4 mb-8">
+            <button id="addTaskBtn" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                Add New Task
+            </button>
+        </div>
+
+        <!-- Kanban Board -->
+        <div id="kanban-board" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- To Do Column -->
+            <div class="bg-white rounded-xl shadow-lg" data-status="todo">
+                <div class="p-4 border-b border-slate-200 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                        <span class="w-3 h-3 bg-red-400 rounded-full mr-3"></span>
+                        To Do
+                    </h2>
+                    <button id="suggestTaskBtn" title="Suggest a new task based on current work" class="text-sm bg-violet-100 text-violet-600 font-semibold py-1 px-3 rounded-full hover:bg-violet-200 transition-all duration-300 flex items-center gap-1">
+                        ✨ Suggest Task
+                    </button>
+                </div>
+                <div id="todo-tasks" class="tasks-container p-4 min-h-[200px] max-h-[60vh] overflow-y-auto"></div>
+            </div>
+
+            <!-- In Progress Column -->
+            <div class="bg-white rounded-xl shadow-lg" data-status="inprogress">
+                <div class="p-4 border-b border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><span class="w-3 h-3 bg-yellow-400 rounded-full mr-3"></span>In Progress</h2>
+                </div>
+                <div id="inprogress-tasks" class="tasks-container p-4 min-h-[200px] max-h-[60vh] overflow-y-auto"></div>
+            </div>
+
+            <!-- Done Column -->
+            <div class="bg-white rounded-xl shadow-lg" data-status="done">
+                <div class="p-4 border-b border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center"><span class="w-3 h-3 bg-green-400 rounded-full mr-3"></span>Done</h2>
+                </div>
+                <div id="done-tasks" class="tasks-container p-4 min-h-[200px] max-h-[60vh] overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden transition-opacity duration-300">
+        <div class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md transform transition-all duration-300 scale-95">
+            <h3 class="text-xl font-bold mb-4">Create a New Task</h3>
+            <form id="taskForm">
+                <textarea id="taskInput" class="w-full border-slate-300 rounded-md p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" rows="4" placeholder="What do you need to do?" required></textarea>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancelBtn" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition">Add Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="subtaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden transition-opacity duration-300">
+        <div class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg transform transition-all duration-300 scale-95">
+            <h3 class="text-xl font-bold mb-2">✨ AI-Generated Sub-tasks</h3>
+            <p id="originalTaskText" class="text-sm text-slate-500 mb-4 pb-2 border-b"></p>
+            <div id="subtaskList" class="space-y-2 max-h-60 overflow-y-auto"></div>
+            <div class="mt-6 flex justify-end">
+                <button type="button" id="closeSubtaskBtn" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-white bg-opacity-75 flex-col items-center justify-center hidden z-50">
+        <div class="loader"></div>
+        <p class="mt-4 text-slate-600 font-medium">✨ AI is thinking...</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const taskModal = document.getElementById('taskModal');
+            const subtaskModal = document.getElementById('subtaskModal');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const addTaskBtn = document.getElementById('addTaskBtn');
+            const suggestTaskBtn = document.getElementById('suggestTaskBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const closeSubtaskBtn = document.getElementById('closeSubtaskBtn');
+            const taskForm = document.getElementById('taskForm');
+            const taskInput = document.getElementById('taskInput');
+            const todoTasks = document.getElementById('todo-tasks');
+            const inprogressTasks = document.getElementById('inprogress-tasks');
+            const doneTasks = document.getElementById('done-tasks');
+
+            // --- State Management ---
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [
+                { id: `task-${Date.now()}-1`, text: 'Launch a new marketing campaign for Q3', status: 'todo' },
+                { id: `task-${Date.now()}-2`, text: 'Develop the user authentication feature', status: 'inprogress' },
+                { id: `task-${Date.now()}-3`, text: 'Set up the project repository on GitHub', status: 'done' },
+            ];
+            const saveTasks = () => localStorage.setItem('tasks', JSON.stringify(tasks));
+
+            // --- Task Rendering ---
+            const renderTasks = () => {
+                todoTasks.innerHTML = '';
+                inprogressTasks.innerHTML = '';
+                doneTasks.innerHTML = '';
+                tasks.forEach(task => {
+                    const taskElement = createTaskElement(task);
+                    if (task.status === 'todo') todoTasks.appendChild(taskElement);
+                    else if (task.status === 'inprogress') inprogressTasks.appendChild(taskElement);
+                    else doneTasks.appendChild(taskElement);
+                });
+            };
+
+            const createTaskElement = (task) => {
+                const div = document.createElement('div');
+                div.id = task.id;
+                div.className = 'task-card bg-slate-50 p-3 rounded-lg border border-slate-200 mb-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow';
+                
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = 'flex justify-between items-start';
+
+                const p = document.createElement('p');
+                p.className = 'text-slate-700 mr-4 flex-1';
+                p.textContent = task.text;
+                
+                const controls = document.createElement('div');
+                controls.className = 'flex items-center space-x-1 flex-shrink-0';
+
+                const breakdownBtn = document.createElement('button');
+                breakdownBtn.className = 'text-slate-400 hover:text-violet-500 transition-colors p-1 rounded-full hover:bg-violet-100';
+                breakdownBtn.innerHTML = '✨';
+                breakdownBtn.title = '✨ Break down into sub-tasks';
+                breakdownBtn.onclick = (e) => { e.stopPropagation(); handleBreakDownTask(task.id); };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-slate-400 hover:text-red-500 transition-colors p-1';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.title = 'Delete task';
+                deleteBtn.onclick = () => deleteTask(task.id);
+
+                controls.appendChild(breakdownBtn);
+                controls.appendChild(deleteBtn);
+                contentWrapper.appendChild(p);
+                contentWrapper.appendChild(controls);
+                div.appendChild(contentWrapper);
+                return div;
+            };
+
+            // --- Task Operations ---
+            const addTask = (text) => {
+                const newTask = { id: `task-${Date.now()}`, text, status: 'todo' };
+                tasks.push(newTask);
+                saveTasks();
+                renderTasks();
+            };
+            const deleteTask = (taskId) => {
+                tasks = tasks.filter(task => task.id !== taskId);
+                saveTasks();
+                renderTasks();
+            };
+            const updateTaskStatus = (taskId, newStatus) => {
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    const oldStatus = task.status;
+                    task.status = newStatus;
+                    saveTasks();
+                    if (newStatus === 'done' && oldStatus !== 'done') triggerConfetti();
+                }
+            };
+
+            // --- Modal Handling ---
+            const openModal = (id, onOpen = () => {}) => {
+                const modal = document.getElementById(id);
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.add('opacity-100');
+                    modal.querySelector('div').classList.remove('scale-95');
+                    onOpen();
+                }, 10);
+            };
+            const closeModal = (id, onClosed = () => {}) => {
+                const modal = document.getElementById(id);
+                modal.classList.remove('opacity-100');
+                modal.querySelector('div').classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    onClosed();
+                }, 300);
+            };
+            const showLoader = () => loadingOverlay.classList.remove('hidden');
+            const hideLoader = () => loadingOverlay.classList.add('hidden');
+
+            // --- Gemini API Integration ---
+            const callGeminiAPI = async (prompt) => {
+                showLoader();
+                const apiKey = ""; // Canvas will provide the key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }]
+                };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        throw new Error("Invalid response structure from API.");
+                    }
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    alert("Sorry, the AI feature is currently unavailable. Please try again later.");
+                    return null;
+                } finally {
+                    hideLoader();
+                }
+            };
+
+            const handleBreakDownTask = async (taskId) => {
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                const prompt = `Break the following high-level task into a list of smaller, actionable sub-tasks. Present them as a simple list with hyphens. Do not add any introductory text, just the list.\n\nTask: "${task.text}"`;
+                
+                const resultText = await callGeminiAPI(prompt);
+                if (!resultText) return;
+
+                document.getElementById('originalTaskText').textContent = `Original: ${task.text}`;
+                const subtaskList = document.getElementById('subtaskList');
+                subtaskList.innerHTML = resultText.split('\n')
+                    .filter(line => line.trim().startsWith('-'))
+                    .map(item => `<div class="flex items-center bg-slate-100 p-2 rounded-md"><span class="text-blue-500 mr-2">✓</span><p class="text-slate-700">${item.substring(1).trim()}</p></div>`)
+                    .join('');
+                
+                openModal('subtaskModal');
+            };
+
+            const handleSuggestNextTask = async () => {
+                const todoList = tasks.filter(t => t.status === 'todo').map(t => `- ${t.text}`).join('\n');
+                const inProgressList = tasks.filter(t => t.status === 'inprogress').map(t => `- ${t.text}`).join('\n');
+
+                if (todoList.length === 0 && inProgressList.length === 0) {
+                    alert("Add some tasks to 'To Do' or 'In Progress' first so the AI knows what you're working on!");
+                    return;
+                }
+
+                const prompt = `Based on the following tasks, suggest the single most logical next task to add to the "To Do" list. Be concise and provide only the task description, without any prefixes like "Next task:" or quotes.\n\nTasks in progress:\n${inProgressList}\n\nTasks to do:\n${todoList}`;
+                
+                const suggestedTask = await callGeminiAPI(prompt);
+                if (suggestedTask) {
+                    openModal('taskModal', () => {
+                        taskInput.value = suggestedTask.trim();
+                        taskInput.focus();
+                    });
+                }
+            };
+
+            // --- Confetti ---
+            const triggerConfetti = () => {
+                const duration = 3 * 1000, animationEnd = Date.now() + duration;
+                const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+                const randomInRange = (min, max) => Math.random() * (max - min) + min;
+                const interval = setInterval(() => {
+                    const timeLeft = animationEnd - Date.now();
+                    if (timeLeft <= 0) return clearInterval(interval);
+                    const particleCount = 50 * (timeLeft / duration);
+                    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+                    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+                }, 250);
+            };
+
+            // --- Event Listeners ---
+            addTaskBtn.addEventListener('click', () => openModal('taskModal', () => taskInput.focus()));
+            suggestTaskBtn.addEventListener('click', handleSuggestNextTask);
+            cancelBtn.addEventListener('click', () => closeModal('taskModal', () => taskForm.reset()));
+            closeSubtaskBtn.addEventListener('click', () => closeModal('subtaskModal'));
+            taskModal.addEventListener('click', (e) => { if (e.target === taskModal) closeModal('taskModal', () => taskForm.reset()); });
+            subtaskModal.addEventListener('click', (e) => { if (e.target === subtaskModal) closeModal('subtaskModal'); });
+            taskForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (taskInput.value.trim()) {
+                    addTask(taskInput.value.trim());
+                    closeModal('taskModal', () => taskForm.reset());
+                }
+            });
+
+            // --- Initialize SortableJS ---
+            [todoTasks, inprogressTasks, doneTasks].forEach(el => {
+                new Sortable(el, {
+                    group: 'tasks', animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
+                    onEnd: (evt) => {
+                        const taskId = evt.item.id;
+                        const newStatus = evt.to.parentElement.dataset.status;
+                        updateTaskStatus(taskId, newStatus);
+                    }
+                });
+            });
+
+            // Initial Render
+            renderTasks();
+        });
+    </script>
+
+</body>
+</html>
